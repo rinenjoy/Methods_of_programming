@@ -1,0 +1,4 @@
+fastapi
+uvicorn
+httpx   # для запросов к роботу
+pydantic     # Валидация данных и схем

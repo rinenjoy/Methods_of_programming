@@ -1,0 +1,26 @@
+services:
+  # Блок управления (Control System)
+  control:
+    build: ./control
+    container_name: walle_control
+    ports:
+      - "8000:8000"
+    environment:
+      - ROBOT_URL=http://robot:8001
+    depends_on:
+      - robot
+    networks:
+      - walle_network
+
+  # Блок робота (Wall-E Robot)
+  robot:
+    build: ./robot
+    container_name: walle_robot
+    ports:
+      - "8001:8001"
+    networks:
+      - walle_network
+
+networks:
+  walle_network:
+    driver: bridge
