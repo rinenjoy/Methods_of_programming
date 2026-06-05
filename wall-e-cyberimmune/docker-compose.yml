@@ -1,0 +1,678 @@
+services:
+  zookeeper:
+    image: confluentinc/cp-zookeeper:7.2.0
+    container_name: zookeeper
+    environment:
+      - ZOOKEEPER_CLIENT_PORT=2181
+      - ZOOKEEPER_TICK_TIME=2000
+    networks:
+      - walle_network
+
+  broker:
+    image: confluentinc/cp-kafka:7.2.0
+    container_name: broker
+    ports:
+      - "9092:9092"
+    expose:
+      - "29092"
+    depends_on:
+      - zookeeper
+    environment:
+      KAFKA_BROKER_ID: 1
+      KAFKA_ZOOKEEPER_CONNECT: zookeeper:2181
+      KAFKA_LISTENER_SECURITY_PROTOCOL_MAP: PLAINTEXT:PLAINTEXT,PLAINTEXT_HOST:PLAINTEXT
+      KAFKA_ADVERTISED_LISTENERS: PLAINTEXT://broker:9092,PLAINTEXT_HOST://localhost:9093
+      KAFKA_OFFSETS_TOPIC_REPLICATION_FACTOR: 1
+      KAFKA_TRANSACTION_STATE_LOG_MIN_ISR: 1
+      KAFKA_TRANSACTION_STATE_LOG_REPLICATION_FACTOR: 1
+      KAFKA_GROUP_INITIAL_REBALANCE_DELAY_MS: 0
+      KAFKA_AUTO_CREATE_TOPICS_ENABLE: "true"
+    networks:
+      - walle_network
+
+  # === Физический имитатор робота (как cars/ в примере хакатона) ===
+  wall-e:
+    build: ./wall-e
+    image: wall-e
+    container_name: wall-e
+    ports:
+      - "8000:8000"
+    environment:
+      - ORCHESTRATOR_URL=http://orchestrator-tasks:6101
+    networks:
+      - walle_network
+
+  # === Клиент оператора ===
+  operator:
+    build: ./operator
+    image: operator
+    container_name: operator
+    ports:
+      - "7000:7000"
+    environment:
+      - ORCHESTRATOR_URL=http://orchestrator-tasks:6101
+    depends_on:
+      - orchestrator-tasks
+    networks:
+      - walle_network
+
+
+  monitor:
+    build: ./management-system/modules/monitor
+    image: monitor
+    entrypoint:
+      - bash
+      - -c
+      - |
+        echo 'Giving Kafka a bit of time to start up…'
+        sleep 25
+        venv/bin/python start.py /shared/config.ini --reset
+    container_name: monitor
+    environment:
+      - MODULE_NAME=monitor
+    volumes:
+      - ./management-system/shared:/shared
+    depends_on:
+      - broker
+    networks:
+      - walle_network
+
+  orchestrator-tasks:
+    build: ./management-system/modules/orchestrator-tasks
+    image: orchestrator-tasks
+    entrypoint:
+      - bash
+      - -c
+      - |
+        echo 'Giving Kafka a bit of time to start up…'
+        sleep 25
+        venv/bin/python start.py /shared/config.ini --reset
+    container_name: orchestrator-tasks
+    environment:
+      - MODULE_NAME=orchestrator-tasks
+      - MODULE_PORT=6101
+    volumes:
+      - ./management-system/shared:/shared
+    depends_on:
+      - broker
+      - monitor
+    ports:
+      - 6101:6101
+    networks:
+      - walle_network
+
+  data-channel:
+    build: ./management-system/modules/data-channel
+    image: data-channel
+    entrypoint:
+      - bash
+      - -c
+      - |
+        echo 'Giving Kafka a bit of time to start up…'
+        sleep 25
+        venv/bin/python start.py /shared/config.ini --reset
+    container_name: data-channel
+    environment:
+      - MODULE_NAME=data-channel
+    volumes:
+      - ./management-system/shared:/shared
+    depends_on:
+      - broker
+      - monitor
+    networks:
+      - walle_network
+
+  emergency-block:
+    build: ./management-system/modules/emergency-block
+    image: emergency-block
+    entrypoint:
+      - bash
+      - -c
+      - |
+        echo 'Giving Kafka a bit of time to start up…'
+        sleep 25
+        venv/bin/python start.py /shared/config.ini --reset
+    container_name: emergency-block
+    environment:
+      - MODULE_NAME=emergency-block
+    volumes:
+      - ./management-system/shared:/shared
+    depends_on:
+      - broker
+      - monitor
+    networks:
+      - walle_network
+
+  emergency-stop:
+    build: ./management-system/modules/emergency-stop
+    image: emergency-stop
+    entrypoint:
+      - bash
+      - -c
+      - |
+        echo 'Giving Kafka a bit of time to start up…'
+        sleep 25
+        venv/bin/python start.py /shared/config.ini --reset
+    container_name: emergency-stop
+    environment:
+      - MODULE_NAME=emergency-stop
+    volumes:
+      - ./management-system/shared:/shared
+    depends_on:
+      - broker
+      - monitor
+    networks:
+      - walle_network
+
+  task-handler:
+    build: ./management-system/modules/task-handler
+    image: task-handler
+    entrypoint:
+      - bash
+      - -c
+      - |
+        echo 'Giving Kafka a bit of time to start up…'
+        sleep 25
+        venv/bin/python start.py /shared/config.ini --reset
+    container_name: task-handler
+    environment:
+      - MODULE_NAME=task-handler
+    volumes:
+      - ./management-system/shared:/shared
+    depends_on:
+      - broker
+      - monitor
+    networks:
+      - walle_network
+
+  env-assessment:
+    build: ./management-system/modules/env-assessment
+    image: env-assessment
+    entrypoint:
+      - bash
+      - -c
+      - |
+        echo 'Giving Kafka a bit of time to start up…'
+        sleep 25
+        venv/bin/python start.py /shared/config.ini --reset
+    container_name: env-assessment
+    environment:
+      - MODULE_NAME=env-assessment
+    volumes:
+      - ./management-system/shared:/shared
+    depends_on:
+      - broker
+      - monitor
+    networks:
+      - walle_network
+
+  motion-planner:
+    build: ./management-system/modules/motion-planner
+    image: motion-planner
+    entrypoint:
+      - bash
+      - -c
+      - |
+        echo 'Giving Kafka a bit of time to start up…'
+        sleep 25
+        venv/bin/python start.py /shared/config.ini --reset
+    container_name: motion-planner
+    environment:
+      - MODULE_NAME=motion-planner
+    volumes:
+      - ./management-system/shared:/shared
+    depends_on:
+      - broker
+      - monitor
+    networks:
+      - walle_network
+
+  execution-controller:
+    build: ./management-system/modules/execution-controller
+    image: execution-controller
+    entrypoint:
+      - bash
+      - -c
+      - |
+        echo 'Giving Kafka a bit of time to start up…'
+        sleep 25
+        venv/bin/python start.py /shared/config.ini --reset
+    container_name: execution-controller
+    environment:
+      - MODULE_NAME=execution-controller
+    volumes:
+      - ./management-system/shared:/shared
+    depends_on:
+      - broker
+      - monitor
+    networks:
+      - walle_network
+
+  tracks-control:
+    build: ./management-system/modules/tracks-control
+    image: tracks-control
+    entrypoint:
+      - bash
+      - -c
+      - |
+        echo 'Giving Kafka a bit of time to start up…'
+        sleep 25
+        venv/bin/python start.py /shared/config.ini --reset
+    container_name: tracks-control
+    environment:
+      - MODULE_NAME=tracks-control
+    volumes:
+      - ./management-system/shared:/shared
+    depends_on:
+      - broker
+      - monitor
+    networks:
+      - walle_network
+
+  tracks-motors:
+    build: ./management-system/modules/tracks-motors
+    image: tracks-motors
+    entrypoint:
+      - bash
+      - -c
+      - |
+        echo 'Giving Kafka a bit of time to start up…'
+        sleep 25
+        venv/bin/python start.py /shared/config.ini --reset
+    container_name: tracks-motors
+    environment:
+      - MODULE_NAME=tracks-motors
+    volumes:
+      - ./management-system/shared:/shared
+    depends_on:
+      - broker
+      - monitor
+    networks:
+      - walle_network
+
+  drive-actuators:
+    build: ./management-system/modules/drive-actuators
+    image: drive-actuators
+    entrypoint:
+      - bash
+      - -c
+      - |
+        echo 'Giving Kafka a bit of time to start up…'
+        sleep 25
+        venv/bin/python start.py /shared/config.ini --reset
+    container_name: drive-actuators
+    environment:
+      - MODULE_NAME=drive-actuators
+      - WALL_E_URL=http://wall-e:8000
+    volumes:
+      - ./management-system/shared:/shared
+    depends_on:
+      - broker
+      - monitor
+      - wall-e
+    networks:
+      - walle_network
+
+  claws-control:
+    build: ./management-system/modules/claws-control
+    image: claws-control
+    entrypoint:
+      - bash
+      - -c
+      - |
+        echo 'Giving Kafka a bit of time to start up…'
+        sleep 25
+        venv/bin/python start.py /shared/config.ini --reset
+    container_name: claws-control
+    environment:
+      - MODULE_NAME=claws-control
+    volumes:
+      - ./management-system/shared:/shared
+    depends_on:
+      - broker
+      - monitor
+    networks:
+      - walle_network
+
+  claws-actuators:
+    build: ./management-system/modules/claws-actuators
+    image: claws-actuators
+    entrypoint:
+      - bash
+      - -c
+      - |
+        echo 'Giving Kafka a bit of time to start up…'
+        sleep 25
+        venv/bin/python start.py /shared/config.ini --reset
+    container_name: claws-actuators
+    environment:
+      - MODULE_NAME=claws-actuators
+      - WALL_E_URL=http://wall-e:8000
+    volumes:
+      - ./management-system/shared:/shared
+    depends_on:
+      - broker
+      - monitor
+      - wall-e
+    networks:
+      - walle_network
+
+  lid-system:
+    build: ./management-system/modules/lid-system
+    image: lid-system
+    entrypoint:
+      - bash
+      - -c
+      - |
+        echo 'Giving Kafka a bit of time to start up…'
+        sleep 25
+        venv/bin/python start.py /shared/config.ini --reset
+    container_name: lid-system
+    environment:
+      - MODULE_NAME=lid-system
+      - WALL_E_URL=http://wall-e:8000
+    volumes:
+      - ./management-system/shared:/shared
+    depends_on:
+      - broker
+      - monitor
+      - wall-e
+    networks:
+      - walle_network
+
+  trash-dump:
+    build: ./management-system/modules/trash-dump
+    image: trash-dump
+    entrypoint:
+      - bash
+      - -c
+      - |
+        echo 'Giving Kafka a bit of time to start up…'
+        sleep 25
+        venv/bin/python start.py /shared/config.ini --reset
+    container_name: trash-dump
+    environment:
+      - MODULE_NAME=trash-dump
+      - WALL_E_URL=http://wall-e:8000
+    volumes:
+      - ./management-system/shared:/shared
+    depends_on:
+      - broker
+      - monitor
+      - wall-e
+    networks:
+      - walle_network
+
+  hydraulic-press:
+    build: ./management-system/modules/hydraulic-press
+    image: hydraulic-press
+    entrypoint:
+      - bash
+      - -c
+      - |
+        echo 'Giving Kafka a bit of time to start up…'
+        sleep 25
+        venv/bin/python start.py /shared/config.ini --reset
+    container_name: hydraulic-press
+    environment:
+      - MODULE_NAME=hydraulic-press
+      - WALL_E_URL=http://wall-e:8000
+    volumes:
+      - ./management-system/shared:/shared
+    depends_on:
+      - broker
+      - monitor
+      - wall-e
+    networks:
+      - walle_network
+
+  hydraulic-control:
+    build: ./management-system/modules/hydraulic-control
+    image: hydraulic-control
+    entrypoint:
+      - bash
+      - -c
+      - |
+        echo 'Giving Kafka a bit of time to start up…'
+        sleep 25
+        venv/bin/python start.py /shared/config.ini --reset
+    container_name: hydraulic-control
+    environment:
+      - MODULE_NAME=hydraulic-control
+      - WALL_E_URL=http://wall-e:8000
+    volumes:
+      - ./management-system/shared:/shared
+    depends_on:
+      - broker
+      - monitor
+      - wall-e
+    networks:
+      - walle_network
+
+  lidar:
+    build: ./management-system/modules/lidar
+    image: lidar
+    entrypoint:
+      - bash
+      - -c
+      - |
+        echo 'Giving Kafka a bit of time to start up…'
+        sleep 25
+        venv/bin/python start.py /shared/config.ini --reset
+    container_name: lidar
+    environment:
+      - MODULE_NAME=lidar
+      - WALL_E_URL=http://wall-e:8000
+    volumes:
+      - ./management-system/shared:/shared
+    depends_on:
+      - broker
+      - monitor
+      - wall-e
+    networks:
+      - walle_network
+
+  lidar-processing:
+    build: ./management-system/modules/lidar-processing
+    image: lidar-processing
+    entrypoint:
+      - bash
+      - -c
+      - |
+        echo 'Giving Kafka a bit of time to start up…'
+        sleep 25
+        venv/bin/python start.py /shared/config.ini --reset
+    container_name: lidar-processing
+    environment:
+      - MODULE_NAME=lidar-processing
+    volumes:
+      - ./management-system/shared:/shared
+    depends_on:
+      - broker
+      - monitor
+    networks:
+      - walle_network
+
+  camera-analyzer:
+    build: ./management-system/modules/camera-analyzer
+    image: camera-analyzer
+    entrypoint:
+      - bash
+      - -c
+      - |
+        echo 'Giving Kafka a bit of time to start up…'
+        sleep 25
+        venv/bin/python start.py /shared/config.ini --reset
+    container_name: camera-analyzer
+    environment:
+      - MODULE_NAME=camera-analyzer
+      - WALL_E_URL=http://wall-e:8000
+    volumes:
+      - ./management-system/shared:/shared
+    depends_on:
+      - broker
+      - monitor
+      - wall-e
+    networks:
+      - walle_network
+
+  nav-ins:
+    build: ./management-system/modules/nav-ins
+    image: nav-ins
+    entrypoint:
+      - bash
+      - -c
+      - |
+        echo 'Giving Kafka a bit of time to start up…'
+        sleep 25
+        venv/bin/python start.py /shared/config.ini --reset
+    container_name: nav-ins
+    environment:
+      - MODULE_NAME=nav-ins
+      - WALL_E_URL=http://wall-e:8000
+    volumes:
+      - ./management-system/shared:/shared
+    depends_on:
+      - broker
+      - monitor
+      - wall-e
+    networks:
+      - walle_network
+
+  nav-gnss:
+    build: ./management-system/modules/nav-gnss
+    image: nav-gnss
+    entrypoint:
+      - bash
+      - -c
+      - |
+        echo 'Giving Kafka a bit of time to start up…'
+        sleep 25
+        venv/bin/python start.py /shared/config.ini --reset
+    container_name: nav-gnss
+    environment:
+      - MODULE_NAME=nav-gnss
+      - WALL_E_URL=http://wall-e:8000
+    volumes:
+      - ./management-system/shared:/shared
+    depends_on:
+      - broker
+      - monitor
+      - wall-e
+    networks:
+      - walle_network
+
+  nav-fusion:
+    build: ./management-system/modules/nav-fusion
+    image: nav-fusion
+    entrypoint:
+      - bash
+      - -c
+      - |
+        echo 'Giving Kafka a bit of time to start up…'
+        sleep 25
+        venv/bin/python start.py /shared/config.ini --reset
+    container_name: nav-fusion
+    environment:
+      - MODULE_NAME=nav-fusion
+    volumes:
+      - ./management-system/shared:/shared
+    depends_on:
+      - broker
+      - monitor
+    networks:
+      - walle_network
+
+  self-diagnostics:
+    build: ./management-system/modules/self-diagnostics
+    image: self-diagnostics
+    entrypoint:
+      - bash
+      - -c
+      - |
+        echo 'Giving Kafka a bit of time to start up…'
+        sleep 25
+        venv/bin/python start.py /shared/config.ini --reset
+    container_name: self-diagnostics
+    environment:
+      - MODULE_NAME=self-diagnostics
+    volumes:
+      - ./management-system/shared:/shared
+    depends_on:
+      - broker
+      - monitor
+    networks:
+      - walle_network
+
+  battery-control:
+    build: ./management-system/modules/battery-control
+    image: battery-control
+    entrypoint:
+      - bash
+      - -c
+      - |
+        echo 'Giving Kafka a bit of time to start up…'
+        sleep 25
+        venv/bin/python start.py /shared/config.ini --reset
+    container_name: battery-control
+    environment:
+      - MODULE_NAME=battery-control
+      - WALL_E_URL=http://wall-e:8000
+    volumes:
+      - ./management-system/shared:/shared
+    depends_on:
+      - broker
+      - monitor
+      - wall-e
+    networks:
+      - walle_network
+
+  fill-sensor:
+    build: ./management-system/modules/fill-sensor
+    image: fill-sensor
+    entrypoint:
+      - bash
+      - -c
+      - |
+        echo 'Giving Kafka a bit of time to start up…'
+        sleep 25
+        venv/bin/python start.py /shared/config.ini --reset
+    container_name: fill-sensor
+    environment:
+      - MODULE_NAME=fill-sensor
+      - WALL_E_URL=http://wall-e:8000
+    volumes:
+      - ./management-system/shared:/shared
+    depends_on:
+      - broker
+      - monitor
+      - wall-e
+    networks:
+      - walle_network
+
+  dock-station:
+    build: ./management-system/modules/dock-station
+    image: dock-station
+    entrypoint:
+      - bash
+      - -c
+      - |
+        echo 'Giving Kafka a bit of time to start up…'
+        sleep 25
+        venv/bin/python start.py /shared/config.ini --reset
+    container_name: dock-station
+    environment:
+      - MODULE_NAME=dock-station
+      - WALL_E_URL=http://wall-e:8000
+    volumes:
+      - ./management-system/shared:/shared
+    depends_on:
+      - broker
+      - monitor
+      - wall-e
+    networks:
+      - walle_network
+
+networks:
+  walle_network:
+    driver: bridge
